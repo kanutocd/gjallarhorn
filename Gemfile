@@ -5,9 +5,26 @@ source "https://rubygems.org"
 # Specify your gem's dependencies in bifrost.gemspec
 gemspec
 
-gem "irb"
-gem "rake", "~> 13.0"
+# Core dependencies
+gem "logger"
+gem "yaml"
 
-gem "minitest", "~> 5.16"
+# AWS dependencies
+gem "aws-sdk-ec2"
+gem "aws-sdk-ssm"
 
-gem "rubocop", "~> 1.21"
+# GCP dependencies
+gem "google-cloud-compute"
+
+# Azure dependencies
+gem "azure_mgmt_compute"
+gem "ms_rest"
+
+# Docker dependencies
+gem "docker-api"
+
+# Kubernetes dependencies
+gem "kubeclient"
+
+# CLI dependencies
+gem "thor" # or 'optparse'

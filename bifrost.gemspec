@@ -8,11 +8,11 @@ Gem::Specification.new do |spec|
   spec.authors = ["Ken C. Demanawa"]
   spec.email = ["kenneth.c.demanawa@gmail.com"]
 
-  spec.summary = "TODO: Write a short summary, because RubyGems requires one."
-  spec.description = "TODO: Write a longer description or delete this line."
+  spec.summary = "Multi-cloud deployment strategy as legendary as Asgard's bridge."
+  spec.description = "A Ruby gem that Bifrost can use to deploy applications across all the Realms that ridesbeyond just SSH."
   spec.homepage = "https://github.com/kanutocd/bifrost"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.2.0"
+  spec.required_ruby_version = ">= 3.1.0"
 
   spec.metadata["allowed_push_host"] = "TODO: Set to your gem server 'https://example.com'"
   spec.metadata["homepage_uri"] = spec.homepage
@@ -36,4 +36,9 @@ Gem::Specification.new do |spec|
 
   # For more information and examples about making a new gem, check out our
   # guide at: https://bundler.io/guides/creating_gem.html
+
+  spec.add_development_dependency "irb"
+  spec.add_development_dependency "minitest", "~> 5.16"
+  spec.add_development_dependency "rake", "~> 13.0"
+  spec.add_development_dependency "rubocop", "~> 1.21"
 end
