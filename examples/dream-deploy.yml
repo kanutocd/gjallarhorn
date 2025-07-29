@@ -1,0 +1,182 @@
+# deploy.yml - Universal Deployment Configuration
+# Supports AWS, GCP, Azure, Docker, and Kubernetes
+
+# Production environment using AWS SSM
+production:
+  provider: aws
+  region: us-east-1
+  environment: production
+  services:
+    - name: web
+      ports: ["3000"]
+      replicas: 3
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: postgres://prod-db
+        REDIS_URL: redis://prod-redis
+    - name: worker
+      ports: []
+      replicas: 2
+      env:
+        RAILS_ENV: production
+        QUEUE: critical,default
+
+# Staging on Google Cloud Platform
+staging:
+  provider: gcp
+  project_id: my-project-staging
+  zone: us-central1-a
+  environment: staging
+  services:
+    - name: web
+      ports: ["3000"]
+      replicas: 2
+      env:
+        RAILS_ENV: staging
+        DATABASE_URL: postgres://staging-db
+    - name: worker
+      ports: []
+      replicas: 1
+      env:
+        RAILS_ENV: staging
+
+# Development on Azure
+development:
+  provider: azure
+  subscription_id: "12345678-1234-1234-1234-123456789012"
+  resource_group: dev-resources
+  access_token: "your-azure-token"
+  environment: development
+  services:
+    - name: web
+      ports: ["3000"]
+      replicas: 1
+      env:
+        RAILS_ENV: development
+        DATABASE_URL: postgres://dev-db
+
+# Self-hosted Docker environments
+docker_production:
+  provider: docker
+  environment: production
+  hosts:
+    - url: tcp://docker1.company.com:2376
+      ssl_verify: true
+      cert_path: /path/to/cert.pem
+      key_path: /path/to/key.pem
+      ca_path: /path/to/ca.pem
+    - url: tcp://docker2.company.com:2376
+      ssl_verify: true
+      cert_path: /path/to/cert.pem
+      key_path: /path/to/key.pem
+      ca_path: /path/to/ca.pem
+  services:
+    - name: web
+      ports: ["3000"]
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: postgres://prod-db:5432/myapp
+        REDIS_URL: redis://prod-redis:6379
+
+# Kubernetes cluster (self-hosted or managed)
+k8s_production:
+  provider: kubernetes
+  api_server: "https://k8s-api.company.com:6443"
+  api_version: "apps/v1"
+  namespace: production
+  auth_options:
+    bearer_token_file: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  ssl_options:
+    verify_ssl: true
+    ca_file: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+  services:
+    - name: web
+      ports: [3000]
+      replicas: 5
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: postgres://prod-db:5432/myapp
+    - name: worker
+      ports: []
+      replicas: 3
+      env:
+        RAILS_ENV: production
+        REDIS_URL: redis://prod-redis:6379
+
+# Hybrid setup - Web on Kubernetes, Workers on AWS
+hybrid_production:
+  provider: kubernetes  # Primary provider
+  api_server: "https://k8s-cluster.com:6443"
+  namespace: production
+  auth_options:
+    bearer_token_file: "/path/to/token"
+
+  # Override for specific services
+  service_overrides:
+    worker:
+      provider: aws
+      region: us-east-1
+      instance_filter:
+        tags:
+          Role: worker
+          Environment: production
+
+  services:
+    - name: web
+      ports: [3000]
+      replicas: 10
+      env:
+        RAILS_ENV: production
+    - name: worker
+      ports: []
+      replicas: 5  # Will deploy to AWS instances instead
+      env:
+        RAILS_ENV: production
+
+# Local development
+local:
+  provider: docker
+  environment: development
+  hosts:
+    - url: unix:///var/run/docker.sock
+      ssl_verify: false
+  services:
+    - name: web
+      ports: ["3000"]
+      env:
+        RAILS_ENV: development
+        DATABASE_URL: postgres://localhost:5432/myapp_dev
+
+# Multi-region AWS deployment
+aws_multi_region:
+  provider: aws
+  regions:
+    - us-east-1
+    - us-west-2
+    - eu-west-1
+  environment: production
+  services:
+    - name: web
+      ports: ["3000"]
+      replicas_per_region: 2
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: postgres://prod-db
+
+# Canary deployment configuration
+canary_production:
+  provider: kubernetes
+  api_server: "https://k8s-cluster.com:6443"
+  namespace: production
+  deployment_strategy: canary
+  canary_config:
+    initial_percentage: 10
+    increment_percentage: 25
+    health_check_interval: 30
+    rollback_on_failure: true
+  services:
+    - name: web
+      ports: [3000]
+      replicas: 10
+      env:
+        RAILS_ENV: production
