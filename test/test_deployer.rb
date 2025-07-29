@@ -81,7 +81,7 @@ class TestDeployer < Minitest::Test
       end
 
       Gjallarhorn::Adapter::AWSAdapter.stub(:new, adapter_mock) do
-        deployer.deploy("production", "myapp:v1.0.0")
+        deployer.deploy("production", "myapp:v1.0.0", strategy: "legacy")
       end
 
       adapter_mock.verify
