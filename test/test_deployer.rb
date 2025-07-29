@@ -80,7 +80,7 @@ class TestDeployer < Minitest::Test
           params[:services] == @config["production"]["services"]
       end
 
-      Gjallarhorn::Adapters::AWSAdapter.stub(:new, adapter_mock) do
+      Gjallarhorn::Adapter::AWSAdapter.stub(:new, adapter_mock) do
         deployer.deploy("production", "myapp:v1.0.0")
       end
 

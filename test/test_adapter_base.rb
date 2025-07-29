@@ -5,7 +5,7 @@ require "test_helper"
 class TestAdapterBase < Minitest::Test
   def setup
     @config = { "test" => "config" }
-    @adapter = Gjallarhorn::Adapters::Base.new(@config)
+    @adapter = Gjallarhorn::Adapter::Base.new(@config)
   end
 
   def test_initializes_with_config_and_logger

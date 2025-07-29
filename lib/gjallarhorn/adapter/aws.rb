@@ -2,7 +2,7 @@
 
 # AWS SSM Adapter
 module Gjallarhorn
-  module Adapters
+  module Adapter
     class AWSAdapter < Base
       def initialize(config)
         super

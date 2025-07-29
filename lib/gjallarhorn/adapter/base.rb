@@ -5,7 +5,7 @@ require "logger"
 
 # Base adapter interface
 module Gjallarhorn
-  module Adapters
+  module Adapter
     class Base
       attr_reader :config, :logger
 
