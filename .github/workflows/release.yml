@@ -1,0 +1,120 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  RUBY_VERSION: '3.3'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ env.RUBY_VERSION }}
+        bundler-cache: true
+
+    - name: Configure Git
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Extract tag name
+      id: extract_tag
+      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Verify version matches tag
+      run: |
+        VERSION=$(ruby -e "require './lib/gjallarhorn/version'; puts Gjallarhorn::VERSION")
+        TAG_VERSION="${{ steps.extract_tag.outputs.tag }}"
+        TAG_VERSION=${TAG_VERSION#v}
+        
+        if [ "$VERSION" != "$TAG_VERSION" ]; then
+          echo "Version mismatch: gem version $VERSION != tag version $TAG_VERSION"
+          exit 1
+        fi
+        
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Run tests
+      run: bundle exec rake test
+
+    - name: Run RuboCop
+      run: bundle exec rubocop
+
+    - name: Build gem
+      run: bundle exec rake build
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.extract_tag.outputs.tag }}
+        name: Release ${{ steps.extract_tag.outputs.tag }}
+        draft: false
+        prerelease: ${{ contains(steps.extract_tag.outputs.tag, 'alpha') || contains(steps.extract_tag.outputs.tag, 'beta') || contains(steps.extract_tag.outputs.tag, 'rc') }}
+        files: |
+          pkg/*.gem
+        body: |
+          ## Changes in ${{ steps.extract_tag.outputs.tag }}
+          
+          🎺 **Gjallarhorn ${{ env.VERSION }}** - Multi-cloud deployment guardian
+          
+          ### Features
+          - AWS SSM deployment adapter
+          - Thor-based CLI with deploy, status, rollback commands
+          - YAML configuration system
+          - Comprehensive test coverage
+          
+          ### Installation
+          ```bash
+          gem install gjallarhorn
+          ```
+          
+          ### Usage
+          ```bash
+          gjallarhorn deploy production myapp:v1.0.0
+          gjallarhorn status production
+          gjallarhorn rollback production v0.9.0
+          ```
+          
+          See the [documentation](https://kanutocd.github.io/gjallarhorn) for detailed usage instructions.
+          
+          ---
+          
+          **Full Changelog**: https://github.com/kanutocd/gjallarhorn/compare/v0.0.0...${{ steps.extract_tag.outputs.tag }}
+
+    - name: Publish to RubyGems
+      env:
+        GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+      run: |
+        mkdir -p ~/.gem
+        cat << EOF > ~/.gem/credentials
+        ---
+        :rubygems_api_key: ${{ secrets.RUBYGEMS_API_KEY }}
+        EOF
+        chmod 0600 ~/.gem/credentials
+        gem push pkg/gjallarhorn-${{ env.VERSION }}.gem
+
+    - name: Publish to GitHub Packages
+      env:
+        GEM_HOST_API_KEY: Bearer ${{ secrets.GITHUB_TOKEN }}
+        OWNER: ${{ github.repository_owner }}
+      run: |
+        cat << EOF > ~/.gem/credentials
+        ---
+        :github: Bearer ${{ secrets.GITHUB_TOKEN }}
+        EOF
+        chmod 0600 ~/.gem/credentials
+        gem push --key github --host https://rubygems.pkg.github.com/${{ github.repository_owner }} pkg/gjallarhorn-${{ env.VERSION }}.gem

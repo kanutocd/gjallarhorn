@@ -1,0 +1,89 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.3'
+        bundler-cache: true
+
+    - name: Install YARD
+      run: gem install yard
+
+    - name: Generate YARD documentation
+      run: |
+        mkdir -p docs
+        yard doc --output-dir docs --readme README.md --markup markdown --markup-provider kramdown
+        
+        # Create a custom index page
+        cat > docs/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Gjallarhorn Documentation</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; }
+            .header { text-align: center; margin-bottom: 40px; }
+            .logo { font-size: 3em; margin-bottom: 10px; }
+            .tagline { color: #666; font-size: 1.2em; margin-bottom: 30px; }
+            .links { display: flex; justify-content: center; gap: 20px; }
+            .link { padding: 10px 20px; background: #007cba; color: white; text-decoration: none; border-radius: 5px; }
+            .link:hover { background: #005a85; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo">🎺</div>
+            <h1>Gjallarhorn</h1>
+            <p class="tagline">Multi-cloud deployment guardian as legendary as Heimdall's horn</p>
+            <div class="links">
+              <a href="Gjallarhorn.html" class="link">API Documentation</a>
+              <a href="file.README.html" class="link">Getting Started</a>
+              <a href="https://github.com/kanutocd/gjallarhorn" class="link">GitHub</a>
+              <a href="https://rubygems.org/gems/gjallarhorn" class="link">RubyGems</a>
+            </div>
+          </div>
+        </body>
+        </html>
+        EOF
+
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: docs
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
