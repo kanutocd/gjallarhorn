@@ -7,7 +7,18 @@ class TestBifrost < Minitest::Test
     refute_nil ::Bifrost::VERSION
   end
 
-  def test_it_does_something_useful
-    assert false
+  def test_error_class_exists
+    assert_kind_of Class, Bifrost::Error
+    assert Bifrost::Error < StandardError
+  end
+
+  def test_configuration_error_exists
+    assert_kind_of Class, Bifrost::ConfigurationError
+    assert Bifrost::ConfigurationError < Bifrost::Error
+  end
+
+  def test_deployment_error_exists
+    assert_kind_of Class, Bifrost::DeploymentError
+    assert Bifrost::DeploymentError < Bifrost::Error
   end
 end
