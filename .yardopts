@@ -1,0 +1,12 @@
+--markup markdown
+--markup-provider kramdown
+--readme README.md
+--output-dir doc
+--exclude test/
+--exclude examples/
+--exclude docs/
+--private
+lib/**/*.rb
+-
+CHANGELOG.md
+LICENSE.txt
