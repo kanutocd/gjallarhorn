@@ -81,7 +81,7 @@ class TestConfiguration < Minitest::Test
     with_config_file(@valid_config) do |file|
       config = Gjallarhorn::Configuration.new(file.path)
       services = config.services_for("staging")
-      assert_equal [], services
+      assert_empty services
     end
   end
 
@@ -142,6 +142,33 @@ class TestConfiguration < Minitest::Test
       end
 
       assert_match(/missing required 'provider' field/, error.message)
+    end
+  end
+
+  def test_to_yaml_returns_yaml_string
+    with_config_file(@valid_config) do |file|
+      configuration = Gjallarhorn::Configuration.new(file.path)
+      yaml_output = configuration.to_yaml
+
+      assert_kind_of String, yaml_output
+      assert_match "production", yaml_output
+      assert_match "provider: aws", yaml_output
+    end
+  end
+
+  def test_handles_symbol_environment_names
+    with_config_file(@valid_config) do |file|
+      configuration = Gjallarhorn::Configuration.new(file.path)
+
+      # Should work with symbols
+      env_config = configuration.environment(:production)
+      assert_equal "aws", env_config["provider"]
+
+      provider = configuration.provider_for(:staging)
+      assert_equal "gcp", provider
+
+      services = configuration.services_for(:production)
+      assert_equal @valid_config["production"]["services"], services
     end
   end
 

@@ -71,6 +71,62 @@ class TestCLI < Minitest::Test
     assert_match "Configuration error", output
   end
 
+  def test_deploy_successful_with_valid_config
+    with_config_file(@config) do |file|
+      # Mock the deployer to avoid AWS SDK issues
+      deployer_mock = Minitest::Mock.new
+      deployer_mock.expect(:deploy, nil, ["production", "myapp:v1.0.0"])
+
+      Gjallarhorn::Deployer.stub(:new, deployer_mock) do
+        capture_output do
+          Gjallarhorn::CLI.start(["deploy", "production", "myapp:v1.0.0", "--config", file.path])
+        end
+
+        # Should complete without error
+        assert true
+      end
+
+      deployer_mock.verify
+    end
+  end
+
+  def test_status_successful_with_valid_config
+    with_config_file(@config) do |file|
+      # Mock the deployer to return status
+      deployer_mock = Minitest::Mock.new
+      deployer_mock.expect(:status, ["Service: web - Status: running"], ["production"])
+
+      Gjallarhorn::Deployer.stub(:new, deployer_mock) do
+        output = capture_output do
+          Gjallarhorn::CLI.start(["status", "production", "--config", file.path])
+        end
+
+        assert_match "Status for production", output
+      end
+
+      deployer_mock.verify
+    end
+  end
+
+  def test_rollback_successful_with_valid_config
+    with_config_file(@config) do |file|
+      # Mock the deployer
+      deployer_mock = Minitest::Mock.new
+      deployer_mock.expect(:rollback, nil, ["production", "v1.0.0"])
+
+      Gjallarhorn::Deployer.stub(:new, deployer_mock) do
+        capture_output do
+          Gjallarhorn::CLI.start(["rollback", "production", "v1.0.0", "--config", file.path])
+        end
+
+        # Should complete without error
+        assert true
+      end
+
+      deployer_mock.verify
+    end
+  end
+
   private
 
   def with_config_file(config_hash)

@@ -22,8 +22,16 @@ jobs:
         ruby-version: ${{ matrix.ruby-version }}
         bundler-cache: true
 
-    - name: Run tests
+    - name: Run tests with coverage
       run: bundle exec rake test
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage/.resultset.json
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
 
     - name: Run RuboCop
       run: bundle exec rubocop --format github

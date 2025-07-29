@@ -65,7 +65,7 @@ class TestAdapterBase < Minitest::Test
     # Mock health_check to return true immediately
     @adapter.stub(:health_check, true) do
       result = @adapter.send(:wait_for_health, "web")
-      assert_equal true, result
+      assert result
     end
   end
 
