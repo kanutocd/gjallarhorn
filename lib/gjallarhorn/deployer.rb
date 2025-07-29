@@ -4,6 +4,14 @@ require "logger"
 require_relative "configuration"
 require_relative "adapter/base"
 require_relative "adapter/aws"
+require_relative "deployment/strategy"
+require_relative "deployment/zero_downtime"
+require_relative "deployment/basic"
+require_relative "deployment/legacy"
+require_relative "proxy/manager"
+require_relative "proxy/nginx_manager"
+require_relative "proxy/traefik_manager"
+require_relative "proxy/kamal_proxy_manager"
 
 # Main deployment orchestrator that handles deployments across different cloud providers
 #
@@ -55,19 +63,32 @@ module Gjallarhorn
     #
     # @param environment [String] Target environment name (e.g., 'production', 'staging')
     # @param image [String] Container image tag to deploy (e.g., 'myapp:v1.2.3')
+    # @param strategy [String] Deployment strategy to use ('zero_downtime', 'rolling', 'basic')
     # @raise [DeploymentError] If the deployment fails or provider is not supported
     # @return [void]
-    def deploy(environment, image)
+    def deploy(environment, image, strategy: "zero_downtime")
       adapter = create_adapter(environment)
-      @logger.info "Deploying #{image} to #{environment} using #{adapter.class.name}"
+      deployment_strategy = create_deployment_strategy(strategy, adapter, environment)
 
-      adapter.deploy(
+      @logger.info "Deploying #{image} to #{environment} using #{adapter.class.name} with #{strategy} strategy"
+
+      deployment_strategy.deploy(
         image: image,
         environment: environment,
         services: @configuration.services_for(environment)
       )
 
       @logger.info "Deployment completed successfully"
+    end
+
+    # Deploy with specific strategy (convenience method)
+    #
+    # @param environment [String] Target environment name
+    # @param image [String] Container image tag to deploy
+    # @param strategy [String] Deployment strategy to use
+    # @return [void]
+    def deploy_with_strategy(environment, image, strategy)
+      deploy(environment, image, strategy: strategy)
     end
 
     # Get the current status of services in the specified environment
@@ -107,6 +128,46 @@ module Gjallarhorn
       raise DeploymentError, "Provider '#{provider}' not yet implemented" unless adapter_class
 
       adapter_class.new(env_config)
+    end
+
+    # Create a deployment strategy instance
+    #
+    # @param strategy_name [String] Strategy name ('zero_downtime', 'rolling', 'basic')
+    # @param adapter [Adapter::Base] Adapter instance
+    # @param environment [String] Target environment name
+    # @raise [DeploymentError] If the strategy is not supported
+    # @return [Deployment::Strategy] Deployment strategy instance
+    # @api private
+    def create_deployment_strategy(strategy_name, adapter, environment)
+      proxy_manager = create_proxy_manager(environment) if strategy_name == "zero_downtime"
+
+      case strategy_name
+      when "zero_downtime"
+        Deployment::ZeroDowntime.new(adapter, proxy_manager, @logger)
+      when "basic"
+        Deployment::Basic.new(adapter, proxy_manager, @logger)
+      when "legacy"
+        Deployment::Legacy.new(adapter, proxy_manager, @logger)
+      else
+        raise DeploymentError, "Deployment strategy '#{strategy_name}' not yet implemented"
+      end
+    end
+
+    # Create a proxy manager instance for zero-downtime deployments
+    #
+    # @param environment [String] Target environment name
+    # @return [Proxy::Manager, nil] Proxy manager instance or nil if not configured
+    # @api private
+    def create_proxy_manager(environment)
+      env_config = @configuration.environment(environment)
+      proxy_config = env_config["proxy"]
+
+      return nil unless proxy_config
+
+      Proxy::Manager.create(proxy_config.transform_keys(&:to_sym), @logger)
+    rescue StandardError => e
+      @logger.warn "Failed to create proxy manager: #{e.message}"
+      nil
     end
   end
 
