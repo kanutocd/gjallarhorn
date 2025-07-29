@@ -2,6 +2,9 @@
 
 Multi-cloud deployment guardian as legendary as Heimdall's horn.
 
+> **⚠️ ALPHA RELEASE NOTICE**  
+> This gem is currently in alpha development and **NOT RECOMMENDED FOR PRODUCTION USE**. We are publishing this early version to RubyGems.org primarily to secure the `gjallarhorn` gem name. The API and functionality are subject to significant changes. Use at your own risk.
+
 A Ruby gem that sounds across all cloud realms with secure, API-first deployments beyond SSH:
 
 - AWS (SSM)

@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    gjallarhorn (0.1.0)
+    gjallarhorn (0.1.0.alpha)
 
 GEM
   remote: https://rubygems.org/
