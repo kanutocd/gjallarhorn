@@ -4,8 +4,8 @@ require "yaml"
 require "logger"
 
 # Base adapter interface
-module Bifrost
-  module Adapter
+module Gjallarhorn
+  module Adapters
     class Base
       attr_reader :config, :logger
 

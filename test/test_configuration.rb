@@ -28,14 +28,14 @@ class TestConfiguration < Minitest::Test
 
   def test_loads_configuration_from_file
     with_config_file(@valid_config) do |file|
-      config = Bifrost::Configuration.new(file.path)
+      config = Gjallarhorn::Configuration.new(file.path)
       assert_equal @valid_config, config.data
     end
   end
 
   def test_environment_returns_environment_config
     with_config_file(@valid_config) do |file|
-      config = Bifrost::Configuration.new(file.path)
+      config = Gjallarhorn::Configuration.new(file.path)
       env_config = config.environment("production")
       assert_equal @valid_config["production"], env_config
     end
@@ -43,9 +43,9 @@ class TestConfiguration < Minitest::Test
 
   def test_environment_raises_error_for_missing_environment
     with_config_file(@valid_config) do |file|
-      config = Bifrost::Configuration.new(file.path)
+      config = Gjallarhorn::Configuration.new(file.path)
 
-      error = assert_raises(Bifrost::ConfigurationError) do
+      error = assert_raises(Gjallarhorn::ConfigurationError) do
         config.environment("nonexistent")
       end
 
@@ -55,14 +55,14 @@ class TestConfiguration < Minitest::Test
 
   def test_environments_returns_all_environment_names
     with_config_file(@valid_config) do |file|
-      config = Bifrost::Configuration.new(file.path)
+      config = Gjallarhorn::Configuration.new(file.path)
       assert_equal %w[production staging], config.environments
     end
   end
 
   def test_provider_for_returns_provider_name
     with_config_file(@valid_config) do |file|
-      config = Bifrost::Configuration.new(file.path)
+      config = Gjallarhorn::Configuration.new(file.path)
       assert_equal "aws", config.provider_for("production")
       assert_equal "gcp", config.provider_for("staging")
     end
@@ -70,7 +70,7 @@ class TestConfiguration < Minitest::Test
 
   def test_services_for_returns_services_array
     with_config_file(@valid_config) do |file|
-      config = Bifrost::Configuration.new(file.path)
+      config = Gjallarhorn::Configuration.new(file.path)
       services = config.services_for("production")
       assert_equal 1, services.length
       assert_equal "web", services.first["name"]
@@ -79,15 +79,15 @@ class TestConfiguration < Minitest::Test
 
   def test_services_for_returns_empty_array_when_no_services
     with_config_file(@valid_config) do |file|
-      config = Bifrost::Configuration.new(file.path)
+      config = Gjallarhorn::Configuration.new(file.path)
       services = config.services_for("staging")
       assert_equal [], services
     end
   end
 
   def test_raises_error_for_missing_file
-    error = assert_raises(Bifrost::ConfigurationError) do
-      Bifrost::Configuration.new("nonexistent.yml")
+    error = assert_raises(Gjallarhorn::ConfigurationError) do
+      Gjallarhorn::Configuration.new("nonexistent.yml")
     end
 
     assert_match(/Configuration file 'nonexistent.yml' not found/, error.message)
@@ -95,8 +95,8 @@ class TestConfiguration < Minitest::Test
 
   def test_raises_error_for_invalid_yaml
     with_invalid_yaml_file do |file|
-      error = assert_raises(Bifrost::ConfigurationError) do
-        Bifrost::Configuration.new(file.path)
+      error = assert_raises(Gjallarhorn::ConfigurationError) do
+        Gjallarhorn::Configuration.new(file.path)
       end
 
       assert_match(/Invalid YAML/, error.message)
@@ -105,8 +105,8 @@ class TestConfiguration < Minitest::Test
 
   def test_raises_error_for_empty_configuration
     with_config_file({}) do |file|
-      error = assert_raises(Bifrost::ConfigurationError) do
-        Bifrost::Configuration.new(file.path)
+      error = assert_raises(Gjallarhorn::ConfigurationError) do
+        Gjallarhorn::Configuration.new(file.path)
       end
 
       assert_match(/Configuration file is empty/, error.message)
@@ -121,8 +121,8 @@ class TestConfiguration < Minitest::Test
     }
 
     with_config_file(invalid_config) do |file|
-      error = assert_raises(Bifrost::ConfigurationError) do
-        Bifrost::Configuration.new(file.path)
+      error = assert_raises(Gjallarhorn::ConfigurationError) do
+        Gjallarhorn::Configuration.new(file.path)
       end
 
       assert_match(/Invalid provider 'invalid_provider'/, error.message)
@@ -137,8 +137,8 @@ class TestConfiguration < Minitest::Test
     }
 
     with_config_file(invalid_config) do |file|
-      error = assert_raises(Bifrost::ConfigurationError) do
-        Bifrost::Configuration.new(file.path)
+      error = assert_raises(Gjallarhorn::ConfigurationError) do
+        Gjallarhorn::Configuration.new(file.path)
       end
 
       assert_match(/missing required 'provider' field/, error.message)

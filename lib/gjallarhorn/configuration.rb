@@ -2,7 +2,7 @@
 
 require "yaml"
 
-module Bifrost
+module Gjallarhorn
   class Configuration
     attr_reader :config_file, :data
 

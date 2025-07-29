@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    bifrost (0.1.0)
+    gjallarhorn (0.1.0)
 
 GEM
   remote: https://rubygems.org/
@@ -235,8 +235,8 @@ DEPENDENCIES
   aws-sdk-ec2
   aws-sdk-ssm
   azure_mgmt_compute
-  bifrost!
   docker-api
+  gjallarhorn!
   google-cloud-compute
   irb
   kubeclient

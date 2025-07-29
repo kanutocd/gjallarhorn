@@ -17,16 +17,16 @@ class TestCLI < Minitest::Test
 
   def test_version_command_outputs_version
     output = capture_output do
-      Bifrost::CLI.start(["version"])
+      Gjallarhorn::CLI.start(["version"])
     end
 
-    assert_match Bifrost::VERSION, output
+    assert_match Gjallarhorn::VERSION, output
   end
 
   def test_config_command_shows_configuration
     with_config_file(@config) do |file|
       output = capture_output do
-        Bifrost::CLI.start(["config", "--config", file.path])
+        Gjallarhorn::CLI.start(["config", "--config", file.path])
       end
 
       assert_match "production", output
@@ -36,7 +36,7 @@ class TestCLI < Minitest::Test
 
   def test_deploy_command_with_missing_config_exits_with_error
     output, status = capture_output_and_status do
-      Bifrost::CLI.start(["deploy", "production", "myapp:v1.0.0", "--config", "nonexistent.yml"])
+      Gjallarhorn::CLI.start(["deploy", "production", "myapp:v1.0.0", "--config", "nonexistent.yml"])
     end
 
     assert_equal 1, status
@@ -46,7 +46,7 @@ class TestCLI < Minitest::Test
 
   def test_status_command_with_missing_config_exits_with_error
     output, status = capture_output_and_status do
-      Bifrost::CLI.start(["status", "production", "--config", "nonexistent.yml"])
+      Gjallarhorn::CLI.start(["status", "production", "--config", "nonexistent.yml"])
     end
 
     assert_equal 1, status
@@ -55,7 +55,7 @@ class TestCLI < Minitest::Test
 
   def test_rollback_command_with_missing_config_exits_with_error
     output, status = capture_output_and_status do
-      Bifrost::CLI.start(["rollback", "production", "v1.0.0", "--config", "nonexistent.yml"])
+      Gjallarhorn::CLI.start(["rollback", "production", "v1.0.0", "--config", "nonexistent.yml"])
     end
 
     assert_equal 1, status
@@ -64,7 +64,7 @@ class TestCLI < Minitest::Test
 
   def test_config_command_with_missing_file_exits_with_error
     output, status = capture_output_and_status do
-      Bifrost::CLI.start(["config", "--config", "nonexistent.yml"])
+      Gjallarhorn::CLI.start(["config", "--config", "nonexistent.yml"])
     end
 
     assert_equal 1, status

@@ -1,8 +1,8 @@
-# Bifrost
+# Gjallarhorn
 
-Multi-cloud deployment strategy as legendary as Asgard's bridge.
+Multi-cloud deployment guardian as legendary as Heimdall's horn.
 
-A Ruby gem that Bifrost can use to deploy applications across all the Realms that ridesbeyond just SSH:
+A Ruby gem that sounds across all cloud realms with secure, API-first deployments beyond SSH:
 
 - AWS (SSM)
 - Google Cloud Platform (Compute Engine API)
@@ -39,7 +39,7 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/kanutocd/bifrost. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/kanutocd/bifrost/blob/main/CODE_OF_CONDUCT.md).
+Bug reports and pull requests are welcome on GitHub at https://github.com/kanutocd/gjallarhorn. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/kanutocd/gjallarhorn/blob/main/CODE_OF_CONDUCT.md).
 
 ## License
 
@@ -47,4 +47,4 @@ The gem is available as open source under the terms of the [MIT License](https:/
 
 ## Code of Conduct
 
-Everyone interacting in the Bifrost project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/kanutocd/bifrost/blob/main/CODE_OF_CONDUCT.md).
+Everyone interacting in the Gjallarhorn project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/kanutocd/gjallarhorn/blob/main/CODE_OF_CONDUCT.md).

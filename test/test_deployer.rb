@@ -26,17 +26,17 @@ class TestDeployer < Minitest::Test
 
   def test_initializes_with_configuration
     with_config_file(@config) do |file|
-      deployer = Bifrost::Deployer.new(file.path)
-      assert_kind_of Bifrost::Configuration, deployer.configuration
+      deployer = Gjallarhorn::Deployer.new(file.path)
+      assert_kind_of Gjallarhorn::Configuration, deployer.configuration
       assert_kind_of Logger, deployer.logger
     end
   end
 
   def test_raises_error_for_unsupported_provider
     with_config_file(@config) do |file|
-      deployer = Bifrost::Deployer.new(file.path)
+      deployer = Gjallarhorn::Deployer.new(file.path)
 
-      error = assert_raises(Bifrost::DeploymentError) do
+      error = assert_raises(Gjallarhorn::DeploymentError) do
         deployer.deploy("unsupported", "myapp:v1.0.0")
       end
 
@@ -46,9 +46,9 @@ class TestDeployer < Minitest::Test
 
   def test_status_raises_error_for_unsupported_provider
     with_config_file(@config) do |file|
-      deployer = Bifrost::Deployer.new(file.path)
+      deployer = Gjallarhorn::Deployer.new(file.path)
 
-      error = assert_raises(Bifrost::DeploymentError) do
+      error = assert_raises(Gjallarhorn::DeploymentError) do
         deployer.status("unsupported")
       end
 
@@ -58,9 +58,9 @@ class TestDeployer < Minitest::Test
 
   def test_rollback_raises_error_for_unsupported_provider
     with_config_file(@config) do |file|
-      deployer = Bifrost::Deployer.new(file.path)
+      deployer = Gjallarhorn::Deployer.new(file.path)
 
-      error = assert_raises(Bifrost::DeploymentError) do
+      error = assert_raises(Gjallarhorn::DeploymentError) do
         deployer.rollback("unsupported", "v1.0.0")
       end
 
@@ -70,7 +70,7 @@ class TestDeployer < Minitest::Test
 
   def test_passes_environment_configuration_to_adapter
     with_config_file(@config) do |file|
-      deployer = Bifrost::Deployer.new(file.path)
+      deployer = Gjallarhorn::Deployer.new(file.path)
 
       # Mock the AWS adapter to verify it receives the correct config
       adapter_mock = Minitest::Mock.new
@@ -80,7 +80,7 @@ class TestDeployer < Minitest::Test
           params[:services] == @config["production"]["services"]
       end
 
-      Bifrost::Adapter::AWSAdapter.stub(:new, adapter_mock) do
+      Gjallarhorn::Adapters::AWSAdapter.stub(:new, adapter_mock) do
         deployer.deploy("production", "myapp:v1.0.0")
       end
 

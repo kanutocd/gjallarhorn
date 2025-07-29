@@ -1,22 +1,22 @@
 # frozen_string_literal: true
 
-require_relative "lib/bifrost/version"
+require_relative "lib/gjallarhorn/version"
 
 Gem::Specification.new do |spec|
-  spec.name = "bifrost"
-  spec.version = Bifrost::VERSION
+  spec.name = "gjallarhorn"
+  spec.version = Gjallarhorn::VERSION
   spec.authors = ["Ken C. Demanawa"]
   spec.email = ["kenneth.c.demanawa@gmail.com"]
 
-  spec.summary = "Multi-cloud deployment strategy as legendary as Asgard's bridge."
-  spec.description = "A Ruby gem that Bifrost can use to deploy applications across all the Realms that ridesbeyond just SSH."
-  spec.homepage = "https://github.com/kanutocd/bifrost"
+  spec.summary = "Multi-cloud deployment guardian as legendary as Heimdall's horn."
+  spec.description = "A Ruby gem that sounds across all cloud realms with secure, API-first deployments beyond SSH."
+  spec.homepage = "https://github.com/kanutocd/gjallarhorn"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1.0"
 
   spec.metadata["allowed_push_host"] = "TODO: Set to your gem server 'https://example.com'"
   spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["source_code_uri"] = "https://github.com/kanutocd/bifrost"
+  spec.metadata["source_code_uri"] = "https://github.com/kanutocd/gjallarhorn"
 
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.

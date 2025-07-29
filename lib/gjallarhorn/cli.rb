@@ -4,7 +4,7 @@ require "thor"
 require_relative "deployer"
 require_relative "configuration"
 
-module Bifrost
+module Gjallarhorn
   class CLI < Thor
     desc "deploy ENVIRONMENT IMAGE", "Deploy an image to the specified environment"
     option :config, aliases: "-c", default: "deploy.yml", desc: "Configuration file path"
@@ -51,9 +51,9 @@ module Bifrost
       exit 1
     end
 
-    desc "version", "Show Bifrost version"
+    desc "version", "Show Gjallarhorn version"
     def version
-      puts Bifrost::VERSION
+      puts Gjallarhorn::VERSION
     end
   end
 end

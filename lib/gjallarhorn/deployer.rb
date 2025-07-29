@@ -2,14 +2,14 @@
 
 require "logger"
 require_relative "configuration"
-require_relative "adapter/base"
-require_relative "adapter/aws"
+require_relative "adapters/base"
+require_relative "adapters/aws"
 
 # Main Deployer Class
-module Bifrost
+module Gjallarhorn
   class Deployer
     ADAPTERS = {
-      "aws" => Adapter::AWSAdapter,
+      "aws" => Adapters::AWSAdapter,
       "gcp" => nil, # TODO: Implement in Phase 2
       "azure" => nil, # TODO: Implement in Phase 2
       "docker" => nil, # TODO: Implement in Phase 2

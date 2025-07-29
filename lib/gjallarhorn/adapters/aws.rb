@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 # AWS SSM Adapter
-module Bifrost
-  module Adapter
+module Gjallarhorn
+  module Adapters
     class AWSAdapter < Base
       def initialize(config)
         super
@@ -26,7 +26,7 @@ module Bifrost
             "commands" => commands,
             "executionTimeout" => ["3600"]
           },
-          comment: "Deploy #{image} via Universal Deployer"
+          comment: "Deploy #{image} via Gjallarhorn"
         )
 
         wait_for_command_completion(response.command.command_id, instances)
