@@ -2,12 +2,18 @@
 
 Multi-cloud deployment guardian as legendary as Heimdall's horn.
 
-> **⚠️ ALPHA RELEASE NOTICE**  
-> This gem is currently in alpha development and **NOT RECOMMENDED FOR PRODUCTION USE**. We are publishing this early version to RubyGems.org primarily to secure the `gjallarhorn` gem name. The API and functionality are subject to significant changes. Use at your own risk.
+A Ruby gem that sounds across all cloud realms with secure, API-first deployments beyond SSH. Currently supporting AWS with additional providers planned for future releases.
 
-A Ruby gem that sounds across all cloud realms with secure, API-first deployments beyond SSH:
+## Features
 
-- AWS (SSM)
+**Phase 1 (0.1.0) - AWS Foundation:**
+- ✅ AWS SSM-based deployments (no SSH required)
+- ✅ Thor-based CLI with comprehensive commands
+- ✅ YAML configuration system
+- ✅ Comprehensive test coverage
+- ✅ Complete YARD documentation
+
+**Future Phases:**
 - Google Cloud Platform (Compute Engine API)
 - Microsoft Azure (Run Command API)
 - Self-hosted Docker (Docker API)
@@ -16,23 +22,124 @@ A Ruby gem that sounds across all cloud realms with secure, API-first deployment
 
 ## Installation
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
-
 Install the gem and add to the application's Gemfile by executing:
 
 ```bash
-bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+bundle add gjallarhorn
 ```
 
 If bundler is not being used to manage dependencies, install the gem by executing:
 
 ```bash
-gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+gem install gjallarhorn
 ```
 
 ## Usage
 
-TODO: Write usage instructions here
+### Configuration
+
+Create a `deploy.yml` file in your project root:
+
+```yaml
+production:
+  provider: aws
+  region: us-west-2
+  services:
+    - name: web
+      ports: ["80:8080"]
+      env:
+        RAILS_ENV: production
+        DATABASE_URL: postgresql://user:pass@host/db
+
+staging:
+  provider: aws
+  region: us-west-2
+  services:
+    - name: web
+      ports: ["80:8080"]
+      env:
+        RAILS_ENV: staging
+```
+
+### CLI Commands
+
+Deploy to an environment:
+```bash
+gjallarhorn deploy production myapp:v1.2.3
+```
+
+Check deployment status:
+```bash
+gjallarhorn status production
+```
+
+Rollback to previous version:
+```bash
+gjallarhorn rollback production v1.2.2
+```
+
+View configuration:
+```bash
+gjallarhorn config
+```
+
+Show version:
+```bash
+gjallarhorn version
+```
+
+### AWS Prerequisites
+
+Ensure your EC2 instances have:
+- SSM Agent installed and running
+- Appropriate IAM roles for SSM access
+- Tags: `Environment` (e.g., "production") and `Role` (e.g., "web", "app")
+- Docker installed and running
+
+#### Required IAM Permissions
+
+Your EC2 instances need an IAM role with the following permissions:
+
+**For SSM access:**
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:UpdateInstanceInformation",
+                "ssmmessages:CreateControlChannel",
+                "ssmmessages:CreateDataChannel",
+                "ssmmessages:OpenControlChannel",
+                "ssmmessages:OpenDataChannel"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+**For ECR access (when deploying from ECR):**
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+You can use the AWS managed policy `AmazonSSMManagedInstanceCore` for SSM access, and create a custom policy for ECR access.
 
 ## Development
 
