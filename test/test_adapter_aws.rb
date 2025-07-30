@@ -4,13 +4,14 @@ require "test_helper"
 
 # Mock AWS adapter class that doesn't require AWS SDK
 class MockAWSAdapter < Gjallarhorn::Adapter::Base
-  attr_reader :ssm, :ec2
+  attr_reader :ssm, :ec2, :current_environment
 
   def initialize(config)
     @config = config
     @logger = Logger.new($stdout)
     @ssm = MockSSMClient.new
     @ec2 = MockEC2Client.new
+    @current_environment = nil
   end
 
   def deploy(image:, environment:, services: [])
@@ -44,10 +45,108 @@ class MockAWSAdapter < Gjallarhorn::Adapter::Base
     true # Simplified
   end
 
+  # Set the current deployment environment
+  def set_environment(environment)
+    @current_environment = environment
+  end
+
+  # Start a new container
+  def start_container(container_config)
+    {
+      id: "container-#{Time.now.to_i}",
+      name: container_config[:name],
+      image: container_config[:image],
+      created_at: Time.now.utc
+    }
+  end
+
+  # Get running containers for a service
+  def get_running_containers(service_name)
+    [
+      {
+        id: "container-123",
+        name: "#{service_name}-old",
+        status: "running",
+        created_at: Time.now.utc - 3600,
+        service: service_name
+      }
+    ]
+  end
+
+  # Get container status
+  def get_container_status(container_id)
+    "running"
+  end
+
+  # Stop a container
+  def stop_container(container_id, graceful: true, timeout: 30)
+    @logger.info "Stopping container: #{container_id}"
+  end
+
+  # Remove a container
+  def remove_container(container_id)
+    @logger.info "Removing container: #{container_id}"
+  end
+
+  # Get all containers for a service
+  def get_all_containers(service_name)
+    [
+      {
+        id: "container-123",
+        name: "#{service_name}-old",
+        status: "exited",
+        created_at: Time.now.utc - 7200,
+        service: service_name
+      },
+      {
+        id: "container-456",
+        name: "#{service_name}-current",
+        status: "running",  
+        created_at: Time.now.utc - 3600,
+        service: service_name
+      }
+    ]
+  end
+
+  # Get target instances for deployment
+  def target_instances(environment = nil)
+    # Check if instance IDs are explicitly configured
+    instance_ids = @config["instance_ids"] || @config[:instance_ids] || 
+                  @config["instance-ids"] || @config[:"instance-ids"]
+    
+    if instance_ids && !instance_ids.empty?
+      instance_ids = [instance_ids] unless instance_ids.is_a?(Array)
+      @logger.debug "Using configured instance IDs: #{instance_ids.join(', ')}"
+      return instance_ids
+    end
+    
+    # Fall back to tag-based discovery
+    env_name = environment || @current_environment || @config["environment"] || @config[:environment] || "production"
+    @logger.debug "No instance IDs configured, discovering instances by tags for environment: #{env_name}"
+    discovered_instances = get_instances_by_tags(env_name)
+    
+    if discovered_instances.empty?
+      raise ArgumentError, "No EC2 instances found for environment '#{env_name}'. " \
+                          "Either configure 'instance_ids' in your deploy.yml or ensure your EC2 " \
+                          "instances are tagged with Environment=#{env_name} and Role=web|app"
+    end
+    
+    discovered_instances
+  end
+
   private
 
-  def get_instances_by_tags(_environment)
-    %w[i-123 i-456] # Mock instance IDs
+  def get_instances_by_tags(environment)
+    @logger.debug "Querying EC2 instances with filters: Environment=#{environment}, Role=web|app, state=running"
+    # Mock returning different instances based on environment
+    case environment
+    when "staging"
+      %w[i-staging-123 i-staging-456]
+    when "production"
+      %w[i-prod-123 i-prod-456]
+    else
+      %w[i-123 i-456]
+    end
   end
 
   def build_deployment_commands(image, services)
@@ -143,7 +242,7 @@ class TestAWSAdapter < Minitest::Test
   def test_status_returns_instance_status
     result = @adapter.status
     assert_equal 2, result.length
-    assert_equal "i-123", result[0][:instance]
+    assert_equal "i-prod-123", result[0][:instance]  # Updated to match mock environment behavior
     assert_equal "running", result[0][:status]
   end
 
@@ -198,5 +297,101 @@ class TestAWSAdapter < Minitest::Test
       @adapter.logs(service: "web", lines: 100)
     end
     assert_match(/Subclasses must implement logs/, error.message)
+  end
+
+  def test_set_environment
+    @adapter.set_environment("staging")
+    assert_equal "staging", @adapter.current_environment
+  end
+
+  def test_target_instances_uses_configured_instance_ids
+    config_with_instances = @config.merge(instance_ids: ["i-custom-123", "i-custom-456"])
+    adapter = MockAWSAdapter.new(config_with_instances)
+    
+    instances = adapter.target_instances
+    assert_equal ["i-custom-123", "i-custom-456"], instances
+  end
+
+  def test_target_instances_uses_single_configured_instance_id
+    config_with_instance = @config.merge(instance_ids: "i-single-123")
+    adapter = MockAWSAdapter.new(config_with_instance)
+    
+    instances = adapter.target_instances
+    assert_equal ["i-single-123"], instances
+  end
+
+  def test_target_instances_falls_back_to_tag_discovery
+    instances = @adapter.target_instances("staging")
+    assert_equal ["i-staging-123", "i-staging-456"], instances
+  end
+
+  def test_target_instances_uses_current_environment
+    @adapter.set_environment("staging")
+    instances = @adapter.target_instances
+    assert_equal ["i-staging-123", "i-staging-456"], instances
+  end
+
+  def test_target_instances_raises_error_when_no_instances_found
+    # Mock empty response
+    @adapter.define_singleton_method(:get_instances_by_tags) { |_env| [] }
+    
+    error = assert_raises(ArgumentError) do
+      @adapter.target_instances("nonexistent")
+    end
+    
+    assert_match(/No EC2 instances found for environment 'nonexistent'/, error.message)
+    assert_match(/Either configure 'instance_ids'/, error.message)
+  end
+
+  def test_start_container
+    container_config = {
+      name: "web-container",
+      image: "myapp:v1.0.0",
+      ports: ["80:3000"],
+      env: { "RAILS_ENV" => "production" }
+    }
+    
+    result = @adapter.start_container(container_config)
+    
+    assert result[:id].start_with?("container-")
+    assert_equal "web-container", result[:name]
+    assert_equal "myapp:v1.0.0", result[:image]
+    assert_instance_of Time, result[:created_at]
+  end
+
+  def test_get_running_containers
+    containers = @adapter.get_running_containers("web")
+    
+    assert_equal 1, containers.length
+    assert_equal "container-123", containers[0][:id]
+    assert_equal "web-old", containers[0][:name]
+    assert_equal "running", containers[0][:status]
+    assert_equal "web", containers[0][:service]
+  end
+
+  def test_get_all_containers
+    containers = @adapter.get_all_containers("web")
+    
+    assert_equal 2, containers.length
+    assert containers.any? { |c| c[:status] == "exited" }
+    assert containers.any? { |c| c[:status] == "running" }
+  end
+
+  def test_get_container_status
+    status = @adapter.get_container_status("container-123")
+    assert_equal "running", status
+  end
+
+  def test_stop_container
+    # Should not raise an error
+    @adapter.stop_container("container-123", graceful: true, timeout: 30)
+    @adapter.stop_container("container-456", graceful: false)
+    assert true
+  end
+
+  def test_remove_container
+    # Should not raise an error
+    @adapter.remove_container("container-123")
+    assert true
   end
 end

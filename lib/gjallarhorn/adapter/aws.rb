@@ -28,8 +28,14 @@ module Gjallarhorn
         super
         require "aws-sdk-ssm"
         require "aws-sdk-ec2"
-        @ssm = Aws::SSM::Client.new(region: config[:region])
-        @ec2 = Aws::EC2::Client.new(region: config[:region])
+        
+        # Handle both string and symbol keys for region
+        region = config["region"] || config[:region]
+        raise ArgumentError, "AWS region is required in configuration" unless region
+        
+        @ssm = Aws::SSM::Client.new(region: region)
+        @ec2 = Aws::EC2::Client.new(region: region)
+        @current_environment = nil
       end
 
       # Deploy container images to AWS EC2 instances via SSM
@@ -64,7 +70,8 @@ module Gjallarhorn
       #
       # @return [Array<Hash>] Instance status information
       def status
-        instances = get_instances_by_tags(config[:environment])
+        environment = config["environment"] || config[:environment] || "production"
+        instances = get_instances_by_tags(environment)
         instances.map do |instance_id|
           {
             instance: instance_id,
@@ -83,62 +90,12 @@ module Gjallarhorn
         true # Simplified
       end
 
-      private
-
-      def get_instances_by_tags(environment)
-        resp = @ec2.describe_instances(
-          filters: [
-            { name: "tag:Environment", values: [environment] },
-            { name: "tag:Role", values: %w[web app] },
-            { name: "instance-state-name", values: ["running"] }
-          ]
-        )
-
-        resp.reservations.flat_map(&:instances).map(&:instance_id)
-      end
-
-      def build_deployment_commands(image, services)
-        [
-          "docker pull #{image}",
-          *services.map { |svc| "docker stop #{svc[:name]} || true" },
-          *services.map do |svc|
-            "docker run -d --name #{svc[:name]} " \
-            "#{svc[:ports].map { |p| "-p #{p}" }.join(" ")} " \
-            "#{svc[:env].map { |k, v| "-e #{k}=#{v}" }.join(" ")} " \
-            "#{image}"
-          end
-        ]
-      end
-
-      def execute_deployment_command(instances, commands, image)
-        @ssm.send_command(
-          instance_ids: instances,
-          document_name: "AWS-RunShellScript",
-          parameters: {
-            "commands" => commands,
-            "executionTimeout" => ["3600"]
-          },
-          comment: "Deploy #{image} via Gjallarhorn"
-        )
-      end
-
-      def verify_service_health(services)
-        services.each { |service| wait_for_health(service) }
-      end
-
-      def wait_for_command_completion(command_id, _instances)
-        @ssm.wait_until(:command_executed, command_id: command_id) do |w|
-          w.max_attempts = 60
-          w.delay = 5
-        end
-      end
-
-      def get_instance_status(instance_id)
-        resp = @ec2.describe_instances(instance_ids: [instance_id])
-        instance = resp.reservations.first&.instances&.first
-        instance&.state&.name || "unknown"
-      rescue StandardError
-        "unknown"
+      # Set the current deployment environment
+      #
+      # @param environment [String] Environment name
+      # @return [void]
+      def set_environment(environment)
+        @current_environment = environment
       end
 
       # Start a new container with enhanced configuration
@@ -170,6 +127,89 @@ module Gjallarhorn
 
         output = execute_ssm_command_with_response(cmd)
         parse_container_list(output, service_name)
+      end
+
+      private
+
+      def get_instances_by_tags(environment)
+        @logger.debug "Querying EC2 instances with filters: Environment=#{environment}, Role=web|app, state=running"
+        
+        resp = @ec2.describe_instances(
+          filters: [
+            { name: "tag:Environment", values: [environment] },
+            { name: "tag:Role", values: %w[web app] },
+            { name: "instance-state-name", values: ["running"] }
+          ]
+        )
+
+        instances = resp.reservations.flat_map(&:instances)
+        @logger.debug "Found #{instances.length} instances matching filters"
+        
+        instances.each do |instance|
+          tags_info = begin
+            if instance.respond_to?(:tags) && instance.tags
+              instance.tags.map { |t| "#{t.key}=#{t.value}" }.join(', ')
+            else
+              "N/A"
+            end
+          rescue StandardError
+            "N/A"
+          end
+          @logger.debug "Instance: #{instance.instance_id}, State: #{instance.state.name}, Tags: #{tags_info}"
+        end
+
+        instance_ids = instances.map(&:instance_id)
+        @logger.debug "Returning instance IDs: #{instance_ids.join(', ')}" if instance_ids.any?
+        
+        instance_ids
+      end
+
+      def build_deployment_commands(image, services)
+        [
+          "docker pull #{image}",
+          *services.map { |svc| "docker stop #{svc[:name]} || true" },
+          *services.map do |svc|
+            "docker run -d --name #{svc[:name]} " \
+            "#{svc[:ports].map { |p| "-p #{p}" }.join(" ")} " \
+            "#{svc[:env].map { |k, v| "-e #{k}=#{v}" }.join(" ")} " \
+            "#{image}"
+          end
+        ]
+      end
+
+      def execute_deployment_command(instances, commands, image)
+        @ssm.send_command(
+          instance_ids: instances,
+          document_name: "AWS-RunShellScript",
+          parameters: {
+            "commands" => commands,
+            "executionTimeout" => ["3600"]
+          },
+          comment: "Deploy #{image} via Gjallarhorn"
+        )
+      end
+
+      def verify_service_health(services)
+        services.each { |service| wait_for_health(service) }
+      end
+
+      def wait_for_command_completion(command_id, instances)
+        # Use the first instance for command completion check
+        instance_id = instances.is_a?(Array) ? instances.first : instances
+        @logger.debug "wait_for_command_completion: Using instance #{instance_id} for command #{command_id}"
+        
+        @ssm.wait_until(:command_executed, command_id: command_id, instance_id: instance_id) do |w|
+          w.max_attempts = 60
+          w.delay = 5
+        end
+      end
+
+      def get_instance_status(instance_id)
+        resp = @ec2.describe_instances(instance_ids: [instance_id])
+        instance = resp.reservations.first&.instances&.first
+        instance&.state&.name || "unknown"
+      rescue StandardError
+        "unknown"
       end
 
       # Get all containers for a service (including stopped)
@@ -328,8 +368,12 @@ module Gjallarhorn
       # @param command [String] Command to execute
       # @return [String] Command output
       def execute_ssm_command_with_response(command)
+        instances = target_instances
+        @logger.debug "execute_ssm_command_with_response: Using instances: #{instances.inspect}"
+        @logger.debug "execute_ssm_command_with_response: Command: #{command}"
+        
         response = @ssm.send_command(
-          instance_ids: get_target_instances,
+          instance_ids: instances,
           document_name: "AWS-RunShellScript",
           parameters: {
             "commands" => [command],
@@ -350,6 +394,8 @@ module Gjallarhorn
       # @return [String] Command output
       def get_command_output(command_id)
         instances = target_instances
+        @logger.debug "get_command_output: Using instances: #{instances.inspect}"
+        @logger.debug "get_command_output: First instance: #{instances.first.inspect}"
 
         # Get output from first instance (simplified)
         result = @ssm.get_command_invocation(
@@ -466,8 +512,12 @@ module Gjallarhorn
       # @param command [String] Command to execute
       # @return [void]
       def execute_ssm_command(command)
+        instances = target_instances
+        @logger.debug "execute_ssm_command: Using instances: #{instances.inspect}"
+        @logger.debug "execute_ssm_command: Command: #{command}"
+        
         @ssm.send_command(
-          instance_ids: get_target_instances,
+          instance_ids: instances,
           document_name: "AWS-RunShellScript",
           parameters: {
             "commands" => [command],
@@ -478,9 +528,76 @@ module Gjallarhorn
 
       # Get target instances for the current environment
       #
+      # @param environment [String] Environment name (overrides config)
       # @return [Array<String>] Array of instance IDs
-      def target_instances
-        get_instances_by_tags(@config[:environment] || "production")
+      def target_instances(environment = nil)
+        # Check if instance IDs are explicitly configured
+        instance_ids = @config["instance_ids"] || @config[:instance_ids] || 
+                      @config["instance-ids"] || @config[:"instance-ids"]
+        
+        if instance_ids && !instance_ids.empty?
+          # Use explicitly configured instance IDs
+          instance_ids = [instance_ids] unless instance_ids.is_a?(Array)
+          @logger.debug "Using configured instance IDs: #{instance_ids.join(', ')}"
+          return instance_ids
+        end
+        
+        # Fall back to tag-based discovery
+        # Use provided environment parameter, current environment, config, or default to production
+        env_name = environment || @current_environment || @config["environment"] || @config[:environment] || "production"
+        @logger.debug "No instance IDs configured, discovering instances by tags for environment: #{env_name}"
+        discovered_instances = get_instances_by_tags(env_name)
+        
+        if discovered_instances.empty?
+          raise ArgumentError, "No EC2 instances found for environment '#{env_name}'. " \
+                              "Either configure 'instance_ids' in your deploy.yml or ensure your EC2 " \
+                              "instances are tagged with Environment=#{env_name} and Role=web|app"
+        end
+        
+        discovered_instances
+      end
+
+      # Extract ECR registries from Docker command
+      #
+      # @param docker_cmd [String] Docker command
+      # @return [Array<Hash>] Array of ECR registry information
+      def extract_ecr_registries(docker_cmd)
+        registries = []
+        
+        # Match ECR registry URLs: account.dkr.ecr.region.amazonaws.com
+        ecr_pattern = /(\d+)\.dkr\.ecr\.([^.]+)\.amazonaws\.com/
+        
+        docker_cmd.scan(ecr_pattern) do |account_id, region|
+          registry_url = "#{account_id}.dkr.ecr.#{region}.amazonaws.com"
+          registries << {
+            account_id: account_id,
+            region: region,
+            registry_url: registry_url
+          }
+        end
+        
+        registries.uniq
+      end
+
+      # Authenticate with ECR registries
+      #
+      # @param registries [Array<Hash>] ECR registry information
+      # @return [void]
+      def authenticate_ecr_registries(registries)
+        registries.each do |registry|
+          @logger.info "Authenticating with ECR registry: #{registry[:registry_url]}"
+          
+          login_cmd = "aws ecr get-login-password --region #{registry[:region]} | " \
+                     "docker login --username AWS --password-stdin #{registry[:registry_url]}"
+          
+          begin
+            execute_ssm_command_with_response(login_cmd)
+            @logger.info "Successfully authenticated with ECR registry: #{registry[:registry_url]}"
+          rescue StandardError => e
+            @logger.error "Failed to authenticate with ECR registry #{registry[:registry_url]}: #{e.message}"
+            raise StandardError, "ECR authentication failed for #{registry[:registry_url]}: #{e.message}"
+          end
+        end
       end
 
       # Extract and normalize container configuration
@@ -505,6 +622,13 @@ module Gjallarhorn
       # @param docker_cmd [String] Docker run command
       # @return [String] Container ID
       def execute_container_start(docker_cmd)
+        # Check if we need ECR authentication
+        if docker_cmd.include?('.dkr.ecr.')
+          @logger.debug "ECR registry detected, ensuring authentication"
+          ecr_registries = extract_ecr_registries(docker_cmd)
+          authenticate_ecr_registries(ecr_registries)
+        end
+
         execute_ssm_command_with_response(docker_cmd).strip
       end
 
