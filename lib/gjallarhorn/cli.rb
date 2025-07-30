@@ -3,6 +3,7 @@
 require "thor"
 require_relative "deployer"
 require_relative "configuration"
+require_relative "history"
 
 module Gjallarhorn
   # Command-line interface for Gjallarhorn deployment operations
@@ -22,8 +23,11 @@ module Gjallarhorn
   #
   # @since 0.1.0
   class CLI < Thor
+    # Default configuration file path
+    DEFAULT_CONFIG_FILE = "config/deploy.yml"
+
     desc "deploy ENVIRONMENT IMAGE", "Deploy an image to the specified environment"
-    option :config, aliases: "-c", default: "deploy.yml", desc: "Configuration file path"
+    option :config, aliases: "-c", default: DEFAULT_CONFIG_FILE, desc: "Configuration file path"
     # Deploy a container image to the specified environment
     #
     # @param environment [String] Target environment name
@@ -37,7 +41,7 @@ module Gjallarhorn
     end
 
     desc "status ENVIRONMENT", "Check deployment status for an environment"
-    option :config, aliases: "-c", default: "deploy.yml", desc: "Configuration file path"
+    option :config, aliases: "-c", default: DEFAULT_CONFIG_FILE, desc: "Configuration file path"
     # Check the deployment status for services in an environment
     #
     # @param environment [String] Target environment name
@@ -55,7 +59,7 @@ module Gjallarhorn
     end
 
     desc "rollback ENVIRONMENT VERSION", "Rollback to a previous version"
-    option :config, aliases: "-c", default: "deploy.yml", desc: "Configuration file path"
+    option :config, aliases: "-c", default: DEFAULT_CONFIG_FILE, desc: "Configuration file path"
     # Rollback services in an environment to a previous version
     #
     # @param environment [String] Target environment name
@@ -69,7 +73,7 @@ module Gjallarhorn
     end
 
     desc "config", "Show current configuration"
-    option :config, aliases: "-c", default: "deploy.yml", desc: "Configuration file path"
+    option :config, aliases: "-c", default: DEFAULT_CONFIG_FILE, desc: "Configuration file path"
     # Display the current configuration in YAML format
     def config
       configuration = Configuration.new(options[:config])
@@ -79,10 +83,63 @@ module Gjallarhorn
       exit 1
     end
 
+    desc "history ENVIRONMENT", "Show deployment history for an environment"
+    option :config, aliases: "-c", default: DEFAULT_CONFIG_FILE, desc: "Configuration file path"
+    option :limit, aliases: "-l", type: :numeric, default: 20, desc: "Maximum number of records to show"
+    # Display deployment history for the specified environment
+    #
+    # @param environment [String] Target environment name
+    def history(environment)
+      history_manager = History.new
+      records = history_manager.get_history(environment: environment, limit: options[:limit])
+
+      if records.empty?
+        puts "No deployment history found for #{environment}"
+        return
+      end
+
+      puts "Deployment history for #{environment}:"
+      puts "=" * 60
+
+      records.each do |record|
+        display_deployment_record(record)
+      end
+
+      # Show statistics
+      stats = history_manager.statistics(environment: environment)
+      puts "Statistics:"
+      puts "  Total deployments: #{stats[:total_deployments]}"
+      puts "  Success rate: #{stats[:success_rate]}% (#{stats[:successful_deployments]}/#{stats[:total_deployments]})"
+    rescue StandardError => e
+      puts "Failed to retrieve history: #{e.message}"
+      exit 1
+    end
+
     desc "version", "Show Gjallarhorn version"
     # Display the current Gjallarhorn version
     def version
       puts Gjallarhorn::VERSION
+    end
+
+    private
+
+    # Display a single deployment record with formatting
+    #
+    # @param record [Hash] Deployment record
+    # @return [void]
+    def display_deployment_record(record)
+      timestamp = Time.parse(record["timestamp"]).strftime("%Y-%m-%d %H:%M:%S UTC")
+      status_indicator = case record["status"]
+                         when "success" then "✅"
+                         when "failed" then "❌"
+                         else "🔄"
+                         end
+
+      puts "#{status_indicator} #{timestamp} - #{record["image"]}"
+      puts "   Status: #{record["status"]}"
+      puts "   Strategy: #{record["strategy"]}" if record["strategy"]
+      puts "   Error: #{record["error"]}" if record["error"]
+      puts
     end
   end
 end

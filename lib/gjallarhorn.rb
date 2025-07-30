@@ -24,3 +24,4 @@ end
 require_relative "gjallarhorn/configuration"
 require_relative "gjallarhorn/deployer"
 require_relative "gjallarhorn/cli"
+require_relative "gjallarhorn/history"

@@ -12,6 +12,7 @@ require_relative "proxy/manager"
 require_relative "proxy/nginx_manager"
 require_relative "proxy/traefik_manager"
 require_relative "proxy/kamal_proxy_manager"
+require_relative "history"
 
 # Main deployment orchestrator that handles deployments across different cloud providers
 #
@@ -34,6 +35,9 @@ require_relative "proxy/kamal_proxy_manager"
 module Gjallarhorn
   # Main deployment orchestrator class
   class Deployer
+    # Default configuration file path
+    DEFAULT_CONFIG_FILE = "config/deploy.yml"
+    
     # Mapping of provider names to their corresponding adapter classes
     # @api private
     ADAPTERS = {
@@ -54,9 +58,10 @@ module Gjallarhorn
     #
     # @param config_file [String] Path to the YAML configuration file
     # @raise [ConfigurationError] If the configuration file is invalid
-    def initialize(config_file = "deploy.yml")
+    def initialize(config_file = DEFAULT_CONFIG_FILE)
       @configuration = Configuration.new(config_file)
       @logger = Logger.new($stdout)
+      @history = History.new
     end
 
     # Deploy a container image to the specified environment
@@ -67,6 +72,14 @@ module Gjallarhorn
     # @raise [DeploymentError] If the deployment fails or provider is not supported
     # @return [void]
     def deploy(environment, image, strategy: "zero_downtime")
+      # Record deployment start
+      @history.record_deployment(
+        environment: environment,
+        image: image,
+        status: "started",
+        strategy: strategy
+      )
+
       adapter = create_adapter(environment)
       deployment_strategy = create_deployment_strategy(strategy, adapter, environment)
 
@@ -79,6 +92,24 @@ module Gjallarhorn
       )
 
       @logger.info "Deployment completed successfully"
+
+      # Record successful deployment
+      @history.record_deployment(
+        environment: environment,
+        image: image,
+        status: "success",
+        strategy: strategy
+      )
+    rescue StandardError => e
+      # Record failed deployment
+      @history.record_deployment(
+        environment: environment,
+        image: image,
+        status: "failed",
+        strategy: strategy,
+        error: e.message
+      )
+      raise
     end
 
     # Deploy with specific strategy (convenience method)
@@ -108,8 +139,34 @@ module Gjallarhorn
     # @raise [DeploymentError] If the rollback fails or provider is not supported
     # @return [void]
     def rollback(environment, version)
+      # Record rollback start
+      @history.record_deployment(
+        environment: environment,
+        image: version,
+        status: "started",
+        strategy: "rollback"
+      )
+
       adapter = create_adapter(environment)
       adapter.rollback(version: version)
+
+      # Record successful rollback
+      @history.record_deployment(
+        environment: environment,
+        image: version,
+        status: "success",
+        strategy: "rollback"
+      )
+    rescue StandardError => e
+      # Record failed rollback
+      @history.record_deployment(
+        environment: environment,
+        image: version,
+        status: "failed",
+        strategy: "rollback",
+        error: e.message
+      )
+      raise
     end
 
     private
