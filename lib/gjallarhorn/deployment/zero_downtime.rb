@@ -25,9 +25,14 @@ module Gjallarhorn
       def deploy(image:, environment:, services:)
         @logger.info "Starting zero-downtime deployment of #{image} to #{environment}"
 
+        # Set the environment on the adapter so it knows which environment we're deploying to
+        @adapter.set_environment(environment) if @adapter.respond_to?(:set_environment)
+
         deployment_results = []
 
         services.each do |service|
+          # Convert string keys to symbols for consistency
+          service = service.transform_keys(&:to_sym) if service.is_a?(Hash)
           @logger.info "Deploying service: #{service[:name]}"
           result = deploy_service_zero_downtime(service, image, environment)
           deployment_results << result
@@ -53,6 +58,8 @@ module Gjallarhorn
       # @param environment [String] Target environment
       # @return [Hash] Deployment result
       def deploy_service_zero_downtime(service, image, environment)
+        # Ensure service hash uses symbol keys
+        service = service.transform_keys(&:to_sym) if service.is_a?(Hash)
         service_name = service[:name]
 
         # Step 1: Get current running containers
@@ -116,9 +123,11 @@ module Gjallarhorn
       # @param service_name [String] Service name
       # @return [Array<Hash>] Array of container information
       def get_current_containers(service_name)
+        @logger.debug "get_current_containers: Calling adapter.get_running_containers for service: #{service_name}"
         @adapter.get_running_containers(service_name)
       rescue StandardError => e
         @logger.warn "Failed to get current containers for #{service_name}: #{e.message}"
+        @logger.debug "get_current_containers error backtrace: #{e.backtrace.join("\n")}"
         []
       end
 
@@ -142,7 +151,16 @@ module Gjallarhorn
           restart_policy: service[:restart_policy] || "unless-stopped"
         }
 
-        @adapter.start_container(container_config)
+        @logger.debug "start_new_container: Calling adapter.start_container with config: #{container_config.inspect}"
+        begin
+          result = @adapter.start_container(container_config)
+          @logger.debug "start_new_container: Result: #{result.inspect}"
+          result
+        rescue StandardError => e
+          @logger.error "start_new_container failed: #{e.message}"
+          @logger.debug "start_new_container error backtrace: #{e.backtrace.join("\n")}"
+          raise
+        end
       end
 
       # Build environment variables for container
@@ -158,7 +176,9 @@ module Gjallarhorn
         }
 
         # Add service-specific environment variables
-        env_vars.merge!(service[:env]) if service[:env]
+        # Handle both string and symbol keys from YAML
+        service_env = service[:env] || service["env"]
+        env_vars.merge!(service_env) if service_env
 
         env_vars
       end
